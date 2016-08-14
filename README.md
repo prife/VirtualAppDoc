@@ -1,3 +1,3 @@
 ﻿# VirtualAppDoc
 
-![VABinderProvider](https://raw.githubusercontent.com/VirtualAppDoc/master/pngs/VABinderProvider.png)
+![VABinderProvider](https://raw.githubusercontent.com/prife/VirtualAppDoc/master/pngs/VABinderProvider.png)
