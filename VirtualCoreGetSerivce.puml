@@ -1,0 +1,31 @@
+@startuml
+[-> VirtualCore : getService
+activate VirtualCore
+
+VirtualCore -> ServiceManagerNative : getService
+
+activate ServiceManagerNative
+ServiceManagerNative -> ServiceManagerNative :  getServiceFetcher
+
+activate ServiceManagerNative
+ServiceManagerNative -> ProviderCaller : call
+activate ProviderCaller
+ProviderCaller -> BinderProvider: call
+activate BinderProvider
+ProviderCaller <-- BinderProvider
+note over ProviderCaller,BinderProvider
+这条call调用属于跨进程调用，
+BinderProvider左边的方法调用均位于VA主进程(main process，进程名io.virtualapp)
+右边的BinderProvider个ContentProvider，位于服务进程(server process，进程名io.virtualapp:x)
+当ProviderCaller首次调用call时，Android系统会创建服务进程，启动ContentProvider,
+并调用BinderProvider.onCreate方法。
+end note
+deactivate BinderProvider
+ServiceManagerNative <-- ProviderCaller : call
+deactivate ProviderCaller
+deactivate ServiceManagerNative
+
+deactivate ServiceManagerNative
+
+deactivate VirtualCore
+@enduml

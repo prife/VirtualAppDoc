@@ -1,0 +1,87 @@
+@startuml
+
+[-> StubContentProvider : call
+
+note left
+该新进程被创建的时候，该组件所属的Application类会被系统创建，
+其attachBaseContext方法、onCreate方法都被会调用。
+而VA中双开的应用都是利用VA预先埋下的stub provider/activity生成的进程，
+因此StubContentProvider所在的进程被系统创建时，会依次自动执行VApp类的
+attachBaseContext，也就是会执行VirtualCore.getCore().startup(base);
+也就是自动添加了hook方法。
+endnote
+
+activate StubContentProvider
+    StubContentProvider -> StubContentProvider : initProcess
+    activate StubContentProvider
+        StubContentProvider -> VClientImpl : getClient
+        activate VClientImpl
+            StubContentProvider <-- VClientImpl : client:VClientImpl
+        deactivate VClientImpl
+
+        StubContentProvider -> VActivityManager : attachClient(client)
+        activate VActivityManager
+                VActivityManager -> VActivityManagerService : attachClient
+                activate VActivityManagerService
+                    VActivityManagerService -> IVClient : bindApplication
+                    activate IVClient
+                        IVClient -> VClientImpl : bindApplication
+                        activate VClientImpl
+                            VClientImpl -> VirtualRuntime : setupRuntime
+                            VClientImpl -> VClientImpl : sendMessage
+                            activate VClientImpl
+                            deactivate VClientImpl
+                        deactivate VClientImpl
+                    deactivate IVClient
+                deactivate VActivityManagerService
+
+        deactivate VActivityManager
+
+    deactivate StubContentProvider
+deactivate StubContentProvider
+
+VClientImpl -> VClientImpl : handleBindApplication
+activate VClientImpl
+    VClientImpl -> IOHook : startDexOverride
+    activate IOHook
+    deactivate IOHook
+
+    VClientImpl -> IOHook : hookNative
+    activate IOHook
+    deactivate IOHook
+
+    VClientImpl -> ContextFixer : fixCamera
+    activate ContextFixer
+    deactivate ContextFixer
+
+    VClientImpl -> VClientImpl : installContentProviders
+    activate VClientImpl
+    deactivate VClientImpl
+
+    VClientImpl -> Instrumentation : callApplicationOnCreate
+    activate Instrumentation
+    deactivate Instrumentation
+
+    VClientImpl -> VPackageManager : queryReceivers
+    activate VPackageManager
+    deactivate VPackageManager
+
+    VPackageManager -> VPackageManagerService : queryReceivers
+    activate VPackageManagerService
+    deactivate VPackageManagerService
+
+    VClientImpl -> VClientImpl : installReceivers
+    activate VClientImpl
+    deactivate VClientImpl
+
+    VClientImpl -> VActivityManager : appDoneExecuting
+    activate VActivityManager
+    deactivate VActivityManager
+
+    VActivityManager -> VActivityManagerService : appDoneExecuting
+    activate VActivityManagerService
+    deactivate VActivityManagerService
+
+deactivate VClientImpl
+
+@enduml

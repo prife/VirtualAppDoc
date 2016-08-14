@@ -1,0 +1,44 @@
+@startuml
+[-> VActivityManagerService: systemReady
+activate VActivityManagerService
+VActivityManagerService -> VActivityManagerService: onCreate
+activate VActivityManagerService
+
+note over VActivityManagerService,PackageManager
+调用getPackageInfo读取VA应用的AndroidManifest.xml中定义activity和provider组件
+GET_ACTIVITIES | GET_PROVIDERS | GET_META_DATA
+endnote
+
+VActivityManagerService -> PackageManager : getPackageInfo
+VActivityManagerService <-- PackageManager : packageInfo : PackageInfo
+
+note over VActivityManagerService,PackageManager
+遍历packageInfo.activities，将定义了如下META-DATA属性
+<meta-data android:name="X-Identity" android:value="Stub-User"/>
+的组件加入到stubProcessList中，这些Activity也就是用于双开应用而预先分配
+的桩组件。
+VA会根据设置了两种类型的stub activity：1)普通的Activiy，2)对话框Activity
+以xml中设置的Activity的名称后缀是否以“_”结尾区别。“_"结尾的为对话框Activity
+
+<activity
+    android:name="com.lody.virtual.client.stub.StubActivity$C0_"
+    ...
+    android:process=":p0"
+    android:taskAffinity="com.lody.virtual.vt"
+    android:theme="@android:style/Theme.Dialog">
+    <meta-data
+        android:name="X-Identity"
+        android:value="Stub-User"/>
+之所以做此区别，是为了分别设置不同的主题
+endnote
+
+deactivate VActivityManagerService
+deactivate VActivityManagerService
+
+note left
+stubProcessList : 通过进程名字匹配检查是否是插件进程，
+疑问：进程名字在插件启动后会被设置成应用的包名，且process属性设置的:p1，
+那么应该用endWith来判断，为什么isAppProcess方法用contains判断？
+
+endnote
+@enduml

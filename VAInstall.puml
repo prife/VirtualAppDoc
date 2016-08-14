@@ -1,0 +1,45 @@
+@startuml
+[-> VAppService : installApp
+activate VAppService
+
+VAppService -> VAppService: install
+
+activate VAppService
+VAppService -> VAppService : parsePackage
+
+activate VAppService
+VAppService -> PackageParser : new PackageParser(apk.getPath());
+activate PackageParser
+deactivate PackageParser
+
+VAppService -> PackageParser : parsePackage（apk,...)
+activate PackageParser
+VAppService <-- PackageParser : pkg:PackageParser.Package
+deactivate PackageParser
+
+
+
+deactivate VAppService
+
+VAppService -> AppFileSystem : getAppLibFolder(pkg.packageName)
+VAppService -> NativeLibraryHelperCompat : copyNativeBinaries
+
+VAppService -> AppInfo : new AppInfo()
+VAppService <-- AppInfo : appInfo:AppInfo
+activate AppInfo
+deactivate AppInfo
+
+VAppService -> AppFileSystem : getAppPackageFolder
+VAppService -> AppFileSystem : getAppLibFolder
+VAppService -> AppFileSystem : getAppDVMCacheFolder
+VAppService -> AppFileSystem : getAppCacheFolder
+
+VAppService -> VAppService : notifyAppInstalled
+activate VAppService
+note right : getBroadcastItem(N).onNewApp(pkgName);
+deactivate VAppService
+
+deactivate VAppService
+[<- VAppService :
+deactivate VAppService
+@enduml

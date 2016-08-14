@@ -1,0 +1,13 @@
+@startuml
+[-> BinderProvider : onCreate
+activate BinderProvider
+BinderProvider -> KeepService : startup
+BinderProvider -> AppFileSystem : getDefault
+BinderProvider -> VPackageManagerService: systemReady
+BinderProvider -> VAppManagerService : systemReady
+BinderProvider -> VActivityManagerService: systemReady
+BinderProvider -> VAccountManagerService : systemReady
+
+deactivate BinderProvider
+
+@enduml
