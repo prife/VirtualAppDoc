@@ -2,13 +2,13 @@
 
 ## Server Process 启动流程
 
-** getService **
+**getService**
 ![VirtualCoreGetSerivce](https://raw.githubusercontent.com/prife/VirtualAppDoc/master/pngs/VirtualCoreGetSerivce.png)
 
-** Binder Provider调用过程 **
+**Binder Provider调用过程**
 ![VABinderProvider](https://raw.githubusercontent.com/prife/VirtualAppDoc/master/pngs/VABinderProvider.png)
 
-** VirtualActivityManagerService 启动流程 **
+**VirtualActivityManagerService启动流程**
 ![VAMS](https://raw.githubusercontent.com/prife/VirtualAppDoc/master/pngs/VAMS.png)
 
 ## startActivity 流程
