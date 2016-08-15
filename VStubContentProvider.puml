@@ -58,9 +58,12 @@ activate VClientImpl
     activate VClientImpl
     deactivate VClientImpl
 
-    VClientImpl -> Instrumentation : callApplicationOnCreate
-    activate Instrumentation
-    deactivate Instrumentation
+    VClientImpl -> AppInstrumentation : callApplicationOnCreate
+    activate AppInstrumentation
+        AppInstrumentation -> Instrumentation : callApplicationOnCreate
+        activate Instrumentation
+        deactivate Instrumentation
+    deactivate AppInstrumentation
 
     VClientImpl -> VPackageManager : queryReceivers
     activate VPackageManager

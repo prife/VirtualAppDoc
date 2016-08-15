@@ -1,0 +1,48 @@
+@startuml
+
+[-> StubActivity : onCreate
+
+activate StubActivity
+StubActivity -> Activity : onCreate
+activate Activity
+deactivate Activity
+
+note left
+双开一个普通应用时(Lody云“那些本身不具有插件化功能的应用”）
+并不会执行StubActivity.onCreate方法。
+endnote
+
+StubActivity <-- Activity : intent=getIntent()
+note left
+从StubActivity启动intent的EXTRA_TARGET_INTENT字段中，
+取出真正的要启动的Activity的intent。
+然后调用PatchManager类注入HCallbackHook，这个类会hook掉
+ActivityThread.mH。
+endnote
+
+StubActivity -> PatchManager : checkEnv((HCallbackHook.class)
+activate PatchManager
+    PatchManager -> HCallbackHook : inject
+    activate HCallbackHook
+    deactivate HCallbackHook
+    note over HCallbackHook
+        注入HCallbackHook对象，
+        hook掉ActivityThread.mH里的mCallback
+    endnote
+deactivate PatchManager
+
+StubActivity -> Activity : startActivity
+activate Activity
+deactivate Activity
+
+StubActivity -> Activity : finish
+activate Activity
+deactivate Activity
+note left StubActivity
+    StubActivity的使命完成，
+    调用finish结束自己
+endnote
+
+deactivate StubActivity
+
+@enduml
