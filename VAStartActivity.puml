@@ -4,6 +4,7 @@ box "Main process" #LightBlue
 	participant Hook_StartActivity
 	participant VirtualCore
 	participant VActivityManager
+    participant Activity
 end box
 
 box "Server process" #LightGreen
@@ -15,6 +16,8 @@ end box
 
 box "App Client process" #Gray
 	participant StubContentProvider
+	participant ActivityThread
+	participant HCallbackHook
 end box
 
 [-> Hook_StartActivity : onHook
@@ -82,6 +85,55 @@ activate VActivityManager
             VActivityManagerService <-- VActRedirectResult : result = new VActRedirectResult
         deactivate VActivityManagerService
     deactivate VActivityManagerService
+
+note over Hook_StartActivity
+前面的步骤已经为双开应用创建了一个桩进程，
+接下来在该进程里启动双开应用的Activity，
+下面这一句对应的是onHook方法的最后一行
+return method.invoke(who, args);
+这里Activity.startActivity最终触发了
+ActivityThread.scheduleLaunchActivity
+这个过程中涉及到AMS(system_process进程)、
+应用进程的交互，为了简化逻辑，省略AMS调用时序
+endnote
+
+Hook_StartActivity -> Activity : startActivity
+activate Activity
+    Activity -> ActivityThread : scheduleLaunchActivity
+    activate ActivityThread
+        ActivityThread -> ActivityThread : sendMessage(LAUNCH_ACTIVITY)
+        activate ActivityThread
+        deactivate ActivityThread
+        note over ActivityThread
+        注意，这里被由于桩进程的ActivityThread.mH对象的
+        mCallback已经被hook为HCallbackHook对象，因此
+        这个消息接下来会走到HCallbackHook.handleMessage里
+        endnote
+
+        ActivityThread -> HCallbackHook : handleMessage
+        activate HCallbackHook
+            HCallbackHook -> HCallbackHook : handleLaunchActivity
+            activate HCallbackHook
+            deactivate HCallbackHook
+        deactivate HCallbackHook
+
+        ActivityThread -> ActivityThread : handleLaunchActivity
+        activate ActivityThread
+        deactivate ActivityThread
+
+        note over ActivityThread, HCallbackHook
+        handleLaunchActivity里会将讲偷梁换柱的StubActivity
+        再设置待双开应用需要的intent/component/pkgname/
+        ClassLoader等等，接下来流程继续执行
+        ActivityThread.handleLaunchActivity，创建真正的
+        双开应用的Activity，并调用其onCreate方法。
+
+        **<color red><size:18>这样就启动了被双开应用的Activity</size></color>**
+        endnote
+    deactivate ActivityThread
+
+deactivate Activity
+
 deactivate VActivityManager
 
 deactivate Hook_StartActivity
