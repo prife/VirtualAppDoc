@@ -1,0 +1,7 @@
+@startuml
+ApplicationThreadNative <|-- ApplicationThread
+Binder <|-- ApplicationThreadNative
+interface IApplicationThread <|-- ApplicationThreadNative
+interface IBinder <|-- Binder
+interface IInterface <|-- IApplicationThread
+@enduml

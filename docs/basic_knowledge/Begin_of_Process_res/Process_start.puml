@@ -1,0 +1,127 @@
+@startuml
+
+box "system_server " #LightBlue
+	participant Process
+	participant ActivityManagerService
+end box
+
+box "Zygote" #Gray
+	participant dalvik_system_Zygote
+end box
+
+
+
+box "App Process" #LightGreen
+	participant ActivityThread
+	participant Looper
+	participant H
+	participant LoadedApk
+    participant Instrumentation
+    participant ContextImpl
+    participant Application
+    participant ContentProviderA
+end box
+
+box "Content Provider X" #Yellow
+    participant ContentProviderX
+end box
+
+activate Process
+    Process -> Process : start
+    activate Process
+        Process -> Process : startViaZygote
+        activate Process
+            Process -> dalvik_system_Zygote : zygoteSendArgsAndGetResult
+            activate dalvik_system_Zygote
+            dalvik_system_Zygote -> dalvik_system_Zygote : fork
+            activate dalvik_system_Zygote
+                dalvik_system_Zygote -> ActivityThread : do fork call : main
+                activate ActivityThread
+                    ActivityThread -> Looper : prepareMainLooper
+                    ActivityThread -> ActivityThread : new ActivityThread()
+                    ActivityThread -> ActivityThread : attach
+                    activate ActivityThread
+                        ActivityThread -> ActivityManagerService : attachApplication
+                        activate ActivityManagerService
+                            ActivityManagerService -> ActivityManagerService : attachApplicationLocked
+                            activate ActivityManagerService
+                                ActivityManagerService -> ActivityThread : bindApplication
+                                activate ActivityThread
+                                    ActivityThread -> H : sendMessage : BIND_APPLICATION
+                                    activate H
+                                        H -> H : sendMessage
+                                        H --> ActivityThread : return
+                                    deactivate H
+                                    ActivityThread --> ActivityManagerService : bindApplication return
+                                deactivate ActivityThread
+
+                            deactivate ActivityManagerService
+                        ActivityManagerService --> ActivityThread : attachApplication return
+
+                        deactivate ActivityManagerService
+
+                    deactivate ActivityThread
+                    ActivityThread -> Looper : loop
+                    activate Looper
+                        Looper -> H : handleMessage : BIND_APPLICATION
+                        activate H
+                            H -> ActivityThread : handleBindApplication
+                            activate ActivityThread
+                                ActivityThread -> LoadedApk : makeApplication
+                                activate ActivityThread
+                                    activate LoadedApk
+                                        LoadedApk -> ContextImpl : createAppContext
+                                        activate ContextImpl
+                                        ContextImpl --> LoadedApk
+                                        deactivate ContextImpl
+                                        LoadedApk -> Instrumentation : newApplication
+                                        activate Instrumentation
+                                            Instrumentation -> Application : attach
+                                                activate Application
+                                                    Application -> Application : attachBaseContext
+                                                    Application --> Instrumentation
+                                            deactivate Application
+                                         Instrumentation --> LoadedApk
+                                        deactivate Instrumentation
+                                    LoadedApk --> ActivityThread
+                                    deactivate LoadedApk
+                                deactivate ActivityThread
+                                ActivityThread -> ActivityThread : installContentProviders
+                                activate ActivityThread
+                                    note over ContentProviderA
+                                    maybe the content provider is in another process
+                                    just like ContentProviderX
+                                    end note
+                                    ActivityThread -> ContentProviderA : onCreate
+                                        activate ContentProviderA
+                                            ContentProviderA --> ActivityThread
+                                        deactivate ContentProviderA
+                                    ActivityThread -> ContentProviderX : onCreate
+                                        activate ContentProviderX
+                                            ContentProviderX --> ActivityThread
+                                        deactivate ContentProviderX
+                                deactivate ActivityThread
+                                ActivityThread -> Instrumentation : callApplicationOnCreate
+                                activate ActivityThread
+                                    activate Instrumentation
+                                        Instrumentation -> Application : onCreate
+                                        activate Application
+                                            Application --> Instrumentation
+                                        deactivate Application
+                                        Instrumentation --> ActivityThread
+                                    deactivate Instrumentation
+                                    note over ActivityThread
+                                        handleBindApplication Íê½á
+                                    end note
+                                deactivate ActivityThread
+                            deactivate ActivityThread
+                            ActivityThread --> H : return HandleBindApplication
+                        deactivate H
+                    deactivate Looper
+                deactivate ActivityThread
+            deactivate dalvik_system_Zygote
+            dalvik_system_Zygote -> Process
+            deactivate dalvik_system_Zygote
+        deactivate Process
+
+@enduml
