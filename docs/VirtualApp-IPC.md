@@ -31,14 +31,17 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ##startActivity
 这里有一个认真尽责的startrActivity
 
+```java
 	Intent loadingPageIntent = new Intent(context, LoadingActivity.class);
 	loadingPageIntent.putExtra(MODEL_ARGUMENT, model);
 	loadingPageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 	loadingPageIntent.putExtra(ExtraConstants.EXTRA_INTENT, intent);
 	context.startActivity(loadingPageIntent);
+```
 
 通过之前老罗的文章[Android应用程序启动过程源代码分析](http://blog.csdn.net/luoshengyang/article/details/6689748)，经历了层层外包最终会落点在：Instrumentation::execStartActivity
 
+```java
 	public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
@@ -50,6 +53,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
                         requestCode, 0, null, options);
         ......
     }
+```
 
 但是当代码走到这里，大家都笑了，根据之前的分析VirtualApp之Hook实现  
 我们知道，这里call：ActivityManagerNative.getDefault().startActivity，其实已经被我们hook掉了
@@ -59,6 +63,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 
 ###动态代理HookHandler先走
 
+```java
 	private class HookHandler implements InvocationHandler {
 		@Override
 		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
@@ -75,12 +80,14 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 			......
 		}
 	}
+```
 
 根据ActivityManagerPatch中的注解@Path，我们拿到的是Hook_StartActivity:
 
 ###onHook
 这里的class name虽然是Hook_StartActivity,但是getName返回的是“startActivity”。
 
+```java
 	class Hook_StartActivity extends Hook_BaseStartActivity {
 
 	@Override
@@ -101,11 +108,14 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 		......
 		return method.invoke(who, args);
 	}
+```
 
 ##The start of Remote Serivce :x 
 在onHook函数中，有一句：
 	
+```java
 	VActivityManager.getInstance().redirectTargetActivity(req);
+```
 
 下面我们来逐步剖析一下这个函数的前置事件，在这其中，我们会看到
 
@@ -116,6 +126,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ##VActivityManager.java
 继续分析源代码：
 
+```java
 	public class VActivityManager {
 		private static final VActivityManager sAM = new VActivityManager();
 		private IActivityManager service;
@@ -139,6 +150,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 		}
 		......
 	}
+```
 
 首先getInstance的返回值是**sAM**
 >它是一个静态成员变量：VActivityManager sAM = new VActivityManager();
@@ -146,16 +158,19 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ###VActivityManager::redirectTargetActivity
 这次有点类似by pass，先是通过获取service对象，然后调用service对象的接口来做事：
 	
+```java
 	public VActRedirectResult redirectTargetActivity(VRedirectActRequest request) {
 	try {
 		return getService().redirectTargetActivity(request);
 	} catch (RemoteException e) {
 		return VirtualRuntime.crash(e);
 	}
+```
 
 ###VActivityManager::getService
 来到了重点防守区域，getService：
 
+```java
 		public IActivityManager getService() {
 			if (service == null) {
 				service = IActivityManager.Stub
@@ -163,6 +178,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 			}
 			return service;
 		}
+```
 
 对于这个函数，我们可以分为两步来分析：
 
@@ -174,6 +190,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ###ServiceManagerNative::getService
 依旧直接上源码：
 
+```java
 	public static IBinder getService(String name) {
 		......
 		IServiceFetcher fetcher = getServiceFetcher();
@@ -187,9 +204,11 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 		VLog.e(TAG, "GetService(%s) return null.", name);
 		return null;
 	}
+```
 
 然而并没有看出来点什么，而且这边又出现了一个新的类：IServiceFetcher，它是一个AIDL的东西：
 
+```java
 	// IServiceFetcher.aidl
 	package com.lody.virtual.service.interfaces;
 	
@@ -198,12 +217,14 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 	    void addService(String name,in IBinder service);
 	    void removeService(String name);
 	}
+```
 
 所以，我们继续研究一下getServiceFetcher
 
 ###ServiceManagerNative::getServiceFetcher
 这一部分就会出现关于Content Provider的东西了
 
+```java
 	public synchronized static IServiceFetcher getServiceFetcher() {
 		if (sFetcher == null) {
 			Context context = VirtualCore.getCore().getContext();
@@ -216,25 +237,33 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 		}
 		return sFetcher;
 	}
+```
 
 由于是研究需要，我们假定是第一次call到getServiceFetcher，所以很自然，sFetcher是null。
 
+```java
 	Context context = VirtualCore.getCore().getContext();
+```
 
 这边的content，通过[VirtualApp之Hook实现](http://10.0.12.9:8090/pages/viewpage.action?pageId=11502356)我们知道，其实它是Virtual App Host进程启动的时候application context  
 也就是call startup的时候传入参数，所以我们来到：
 
+```java
 	Bundle response = new ProviderCaller.Builder(context, SERVICE_CP_AUTH).methodName("@").call();
+```
 
 这边是个链式构造，其中：**SERVICE_CP_AUTH = virtual.service.BinderProvider**，所以最后的：
 	
+```java
 	public Bundle call() {
 		return ProviderCaller.call(auth, context, methodName, arg, bundle);
 	}
+```
 
 ###ProviderCaller::call
 从这边看起来，整个call的命令就是让content provider去做事
 
+```java
 	public class ProviderCaller 
 	{
 		......
@@ -245,6 +274,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 		}
 		......
 	}
+```
 
 其中：
 
@@ -256,12 +286,14 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ###Content Provider
 关于content provider的部分，我们直接看一下xml会比较好，注意是lib目录下的AndroidManifest.xml
 
+```xml
     <provider
     	android:name="com.lody.virtual.service.BinderProvider"
     	android:authorities="virtual.service.BinderProvider"
     	android:exported="false"
     	android:process=":x"
 	/>
+```
 
 从这里我们可以看到:
 
@@ -283,6 +315,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ###onCreate
 当Content Provider被唤起的时候，我们来看看onCreate函数
 
+```java
 	@Override
 	public boolean onCreate() {
 		Context context = getContext();
@@ -291,6 +324,7 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 		addService(ServiceManagerNative.ACTIVITY_MANAGER, VActivityManagerService.getService());
 		......
 	}
+```
 
 这里跟SystemServer中的写法类似，会先做一下systemReady，然后addService。  
 由于我们关注的重点是IPC那一段，所以先略过VA中VActivityManagerService的相关部分。  
@@ -299,12 +333,15 @@ Host & Plugin存在一些问题，首当其冲的就是如何解决进程间通�
 ###addService
 代码中并没有太多的惊喜：
 
+```java
 	private void addService(String name, IBinder service) {
 		ServiceCache.addService(name, service);
 	}
+```
 
 ServiceCache是一个工具类，其中使用类静态变量sCache的key-map来维护各个service
 
+```java
 	public class ServiceCache {
 	
 		private static final Map<String, IBinder> sCache = new HashMap<String, IBinder>(5);
@@ -314,14 +351,18 @@ ServiceCache是一个工具类，其中使用类静态变量sCache的key-map来�
 		}
 		......
 	}
+```
 
 说到这里，整个provider的初始化就算是做完了，然后我们需要回到正题：
 
+```java
 	contentResolver.call(uri, methodName, arg, bundle);
+```
 
 ##回归Remote Content Provider：Call
 我们来到BinderProvider的call
 
+```java
 	@Override
 	public Bundle call(String method, String arg, Bundle extras) {
 		if (method.equals(MethodConstants.INIT_SERVICE)) {
@@ -333,22 +374,28 @@ ServiceCache是一个工具类，其中使用类静态变量sCache的key-map来�
 			return bundle;
 		}
 	}
+```
 
 由于method为“@”，所以很自然第一个if判定为false，直接来到：
 	
+```java
 	Bundle bundle = new Bundle();
 	BundleCompat.putBinder(bundle, ExtraConstants.EXTRA_BINDER, mServiceFetcher);
 	return bundle;
+```
 
 ###迷之mServiceFetcher
 **mServiceFetcher**，是BinderProvider的一个内部成员变量
 
+```java
 	public final class BinderProvider extends BaseContentProvider {
 		private final ServiceFetcher mServiceFetcher = new ServiceFetcher();
 	}
+```
 
 对应的class ServiceFetcher，则是BinderProvider的内部类：
 
+```java
 	private class ServiceFetcher extends IServiceFetcher.Stub {
 		@Override
 		public IBinder getService(String name) throws RemoteException {
@@ -370,6 +417,7 @@ ServiceCache是一个工具类，其中使用类静态变量sCache的key-map来�
 			}
 		}
 	}
+```
 
 从ServiceFetcher的继承关系以及之前的理解，我们可以猜到，它是一个AIDL的调用，按下不表。
 
@@ -377,6 +425,7 @@ ServiceCache是一个工具类，其中使用类静态变量sCache的key-map来�
 因为remote的部分通过**return bundle**就回去了。  
 回到之前的**return contentResolver.call(uri, methodName, arg, bundle);**，我们就来到：  
 
+```java
 	public synchronized static IServiceFetcher getServiceFetcher() {
 		if (sFetcher == null) {
 			Context context = VirtualCore.getCore().getContext();
@@ -389,6 +438,7 @@ ServiceCache是一个工具类，其中使用类静态变量sCache的key-map来�
 		}
 		return sFetcher;
 	}
+```
 
 显然，这里的response就是之前remote端回传的Bundle，其中**ExtraConstants.EXTRA_BINDER**字段就是在Remote端：
 >BundleCompat.putBinder(bundle, ExtraConstants.EXTRA_BINDER, mServiceFetcher);
@@ -398,6 +448,7 @@ ok，看到这里我们就明白了，Remote端回传一个ServiceFetcher的bind
 ###退栈到ServiceManagerNative::getService
 走到这里，整个getServiceFetcher的流程就走完了，再看一下源码：
 
+```java
 	public static IBinder getService(String name) {
 		......
 		IServiceFetcher fetcher = getServiceFetcher();
@@ -411,9 +462,11 @@ ok，看到这里我们就明白了，Remote端回传一个ServiceFetcher的bind
 		VLog.e(TAG, "GetService(%s) return null.", name);
 		return null;
 	}
+```
 
 这里可以看到是用fetcher.getService，根据之前的了解AIDL的调用又来到了Remote：
 	
+```java
 	private class ServiceFetcher extends IServiceFetcher.Stub {
 		@Override
 		public IBinder getService(String name) throws RemoteException {
@@ -424,10 +477,12 @@ ok，看到这里我们就明白了，Remote端回传一个ServiceFetcher的bind
 		}
 		......
 	}
+```
 
 ###VA的ActivityManager
 再次退栈：
 
+```java
 	public IActivityManager getService() {
 		if (service == null) {
 			service = IActivityManager.Stub
@@ -435,38 +490,49 @@ ok，看到这里我们就明白了，Remote端回传一个ServiceFetcher的bind
 		}
 		return service;
 	}
+```
 
 可以看到，运行到这里，整个getService的flow就完成了，通过调用：
 	
+```java
 	ServiceManagerNative.getService(ServiceManagerNative.ACTIVITY_MANAGER)
+```
 
 我们获取到的是VActivityManagerService的client对象，而对于VActivityManagerService
 
+```java
 	public class VActivityManagerService extends IActivityManager.Stub
+```
 
 其实又是一个AIDL的类（binder对象），再次通过**IActivityManager.Stub.asInterface**的转换。  
 我们就在client端获取了一个ActivityManager（也即VActivityManagerService）在本地的代理对象。  
 我们直接操作这个代理对象，就可以无感知的去使用Remote端VActivityManagerService的那些方法。  
 因此：
 
+```java
 	public VActRedirectResult redirectTargetActivity(VRedirectActRequest request) {
 	try {
 		return getService().redirectTargetActivity(request);
 	} catch (RemoteException e) {
 		return VirtualRuntime.crash(e);
 	}
+```
 
 最终：**getService().redirectTargetActivity(request)**，就会来到：
 	
+```java
 	VActivityManagerService::redirectTargetActivity
+```
 	
 也就是：
 
+```java
 	public VActRedirectResult redirectTargetActivity(final VRedirectActRequest request) throws RemoteException {
 		synchronized (this) {
 			return redirectTargetActivityLocked(request);
 		}
 	}
+```
 
 分析完毕。
 
