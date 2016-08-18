@@ -42,7 +42,7 @@ Android Studio2.0推出的一项新功能，google的官方介绍：[请看这�
 ![](http://i.imgur.com/MVLb6Sz.png)
 这个dex居然是什么都没有，好在我们还有一个class2.dex，继续做一下反编译：  
 ![](http://i.imgur.com/WnVHkOR.png)
-结果在这个class2.dex中也没有我们的zeusis.multidex.MainActivity.class，而是多了一大堆不晓得从哪里来的class。  
+结果在这个class2.dex中也没有我们的multidex.MainActivity.class，而是多了一大堆不晓得从哪里来的class。  
 **关于这一点，我还反复去AndroidStudio中查看&确认，实在是没有搞明白为什么我会写出那么多莫名其妙的，类（累）**  
 最后没有招了，只得去build中间文件中查找：
 ```java
@@ -51,7 +51,7 @@ Android Studio2.0推出的一项新功能，google的官方介绍：[请看这�
 				app\build\intermediates\incremental-runtime-classes\debug\instant-run.jar
 ```
 
-这两个jar包分别就对应了class.dex以及class2.dex，于是我们又回到了老问题，**zeusis.multidex.MainActivity.class**去哪里了？
+这两个jar包分别就对应了class.dex以及class2.dex，于是我们又回到了老问题，**multidex.MainActivity.class**去哪里了？
 
 ###消失的MainActivity
 上图中，我们能用的招数都用完了，class.dex以及class2.dex并没有什么真相。  
@@ -221,7 +221,7 @@ BootstrapApplication，function call依次为attachBaseContext和onCreate。
 	public class AppInfo
 	{
 	  ……
-	  public static String applicationId = "zeusis.multidex";
+	  public static String applicationId = "multidex";
 	  ……
 	}
 
@@ -243,7 +243,7 @@ BootstrapApplication，function call依次为attachBaseContext和onCreate。
 ```
 
 因此对于**FileManager.getDataFolder**  来说，其实它指向了：  
-**/data/data/zeusis.multidex/files/instant-run**
+**/data/data/multidex/files/instant-run**
 >这里存在一个蛮有意思的点：对于instantRun应用来说，它写死了当前dex的路径  
 >这也是对于PlugIn启动app的时候，为什么我们会找不到对应dex的原因  
 >android中对于不同应用会有不同的userid，不同userid的权限不同，不能交叉访问。  
@@ -251,7 +251,7 @@ BootstrapApplication，function call依次为attachBaseContext和onCreate。
 
 ######FileManager.getDexFileFolder
 依葫芦画瓢，这边**getDexFileFolder**其实是指向了：  
-**/data/data/zeusis.multidex/files/instant-run/dex**
+**/data/data/multidex/files/instant-run/dex**
 
 ######FileManager.extractSlices
 这个function可以认为是简单的把dex文件找到。  
@@ -268,7 +268,7 @@ BootstrapApplication，function call依次为attachBaseContext和onCreate。
 
 数据的来源即：instant-run.zip
 至此，**FileManager.getDexList(paramContext, paramLong);**的部分算是告一段落。  
-它最终会拿到一个list，其中会包含了instant-run.zip目录下的那些dex文件，同时这些dex文件会被存放到：**/data/data/zeusis.multidex/files/instant-run/dex**目录下。
+它最终会拿到一个list，其中会包含了instant-run.zip目录下的那些dex文件，同时这些dex文件会被存放到：**/data/data/multidex/files/instant-run/dex**目录下。
 
 #####IncrementalClassLoader.inject
 继续往下走，看一下IncrementalClassLoader.inject，前面有提到这支function的作用：

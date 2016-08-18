@@ -1,4 +1,6 @@
 #Begin Of Process
+By Howie.Hxu
+
 #前言
 在android的世界中，google为我们屏蔽掉了很多操作系统层面的细节。  
 以至于很多人都习惯性提到android系统，android架构，android程序。  
