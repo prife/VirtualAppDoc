@@ -105,7 +105,7 @@ activate Activity
         activate ActivityThread
         deactivate ActivityThread
         note over ActivityThread
-        注意，这里被由于桩进程的ActivityThread.mH对象的
+        注意，这里由于桩进程的ActivityThread.mH对象的
         mCallback已经被hook为HCallbackHook对象，因此
         这个消息接下来会走到HCallbackHook.handleMessage里
         endnote

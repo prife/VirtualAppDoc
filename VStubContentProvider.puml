@@ -54,9 +54,42 @@ activate VClientImpl
     activate ContextFixer
     deactivate ContextFixer
 
+    VClientImpl -> VClientImpl : fixBoundApp
+    activate VClientImpl
+    deactivate VClientImpl
+    note right
+    这个函数的作用是什么呢？
+    endnote
+
+    VClientImpl -> LoadedApk : makeApplication
+    activate LoadedApk
+    deactivate LoadedApk
+    note right
+    这里完成了被双开应用Applicatoin的调用过程，在被双开应用的Application.attachBaseContex
+    里添加代码打印调用栈，如下
+    java.lang.Throwable
+     at com.droi.helloinstantrun.PrifeApp.attachBaseContext(PrifeApp.java:16)
+     at android.app.Application.attach(Application.java:187)
+     at android.app.Instrumentation.newApplication(Instrumentation.java:997)
+     at android.app.Instrumentation.newApplication(Instrumentation.java:981)
+     at com.lody.virtual.client.hook.delegate.InstrumentationDelegate.
+                     newApplication(InstrumentationDelegate.java:234)
+     at android.app.LoadedApk.makeApplication(LoadedApk.java:573)
+     at com.lody.virtual.client.VClientImpl.handleBindApplication(VClientImpl.java:183)
+     at com.lody.virtual.client.VClientImpl.access$100(VClientImpl.java:45)
+     at com.lody.virtual.client.VClientImpl$H.handleMessage(VClientImpl.java:123)
+     at android.os.Handler.dispatchMessage(Handler.java:102)
+     at android.os.Looper.loop(Looper.java:148)
+     at android.app.ActivityThread.main(ActivityThread.java:5417)
+     at java.lang.reflect.Method.invoke(Native Method)
+     at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:726)
+     at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:616)
+    endnote
+
     VClientImpl -> VClientImpl : installContentProviders
     activate VClientImpl
     deactivate VClientImpl
+
 
     VClientImpl -> AppInstrumentation : callApplicationOnCreate
     activate AppInstrumentation
@@ -79,11 +112,10 @@ activate VClientImpl
 
     VClientImpl -> VActivityManager : appDoneExecuting
     activate VActivityManager
+        VActivityManager -> VActivityManagerService : appDoneExecuting
+        activate VActivityManagerService
+        deactivate VActivityManagerService
     deactivate VActivityManager
-
-    VActivityManager -> VActivityManagerService : appDoneExecuting
-    activate VActivityManagerService
-    deactivate VActivityManagerService
 
 deactivate VClientImpl
 
