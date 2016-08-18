@@ -1,10 +1,10 @@
 # 参考资料
 
 **官方网站**
-1. https://github.com/googlesamples/android-ndk, Android NDK官方参考代码
-1. http://tools.android.com/tech-docs， Android Studio技术文档
-1. http://code.google.com/p/android/issues/list， Android问题列表
-1. http://android-developers.blogspot.com/， Android官方博客
+- https://github.com/googlesamples/android-ndk, Android NDK官方参考代码
+- http://tools.android.com/tech-docs， Android Studio技术文档
+- http://code.google.com/p/android/issues/list， Android问题列表
+- http://android-developers.blogspot.com/， Android官方博客
 
 # Android Studio 安装
 
