@@ -44,12 +44,12 @@ PS.还有很多文章无法一一列举, 谨表谢忱。
 
 ### VA中动态Broadcast注册
 
-动态注册Broadcast，最终都会调用ActivityManagerNatvie#registerReceiver方法，因此VA中hook了这个方法
-然后改造IntentFilter的ACTION字段，具体改造方法与静态广播接收器的方式相同。
+动态注册Broadcast，最终都会调用ActivityManagerNatvie#registerReceiver方法，因此VA中hook了这个方法然后改造IntentFilter的ACTION字段，具体改造方法与静态广播接收器的方式相同。然后创建一个新的`IIntentReceiver$Stub`对象，传递给AMS。也就是所谓静态代理方式。
 
 代码：RegisterReceiver.java
 
-类结构图
+请参考下面类结构图。
+
 ![类结构图](https://rawgit.com/prife/VirtualAppDoc/master/pngs/BroadcastClass.svg)
 
 **PS**
