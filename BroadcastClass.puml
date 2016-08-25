@@ -1,0 +1,59 @@
+@startuml
+
+note as N1
+类说明：
+ReceiverDispatcher、InnerReceiver都是静态内部类
+LoadedApk.ReceiverDispatcher.InnerReceiver 是个Bn端
+
+Client注册广播接收器时，创建了InnerReceiver对象，并传递给
+system_server进程中的AMS服务。
+
+当其他应用向该应用发送广播时，AMS匹配到要发送给本应用后，就
+通过内核binder驱动回调InnerReceiver对象的方法
+endnote
+
+class LoadedApk {
+- ArrayMap mReceivers;
+}
+
+interface IIntentReceiver {
++ void performReceive()
+}
+
+class IIntentReceiver$Stub {
++ void performReceive()
+}
+
+class LoadedApk$ReceiverDispatcher$InnerReceiver {
+- mDispatcher;
++ void performReceive()
+}
+
+class LoadedApk$ReceiverDispatcher {
+- mIIntentReceiver
+}
+
+LoadedApk *-- LoadedApk$ReceiverDispatcher
+IIntentReceiver <|-- IIntentReceiver$Stub
+IIntentReceiver$Stub <|-- LoadedApk$ReceiverDispatcher$InnerReceiver
+LoadedApk$ReceiverDispatcher$InnerReceiver *-- LoadedApk$ReceiverDispatcher
+
+LoadedApk$ReceiverDispatcher *-- LoadedApk$ReceiverDispatcher$InnerReceiver
+
+class ProxyIIntentReceiver {
+- IIntentReceiver old;
++ void performReceive()
+}
+
+note top of ProxyIIntentReceiver
+该类位于RegisterReceiver类，它是VA的hook类，
+用于hook IActivityManage的registerReceiver的方法，
+
+ProxyIIntentReceiver类采用静态代理的方式替换
+registerReceiver方法中的IIntentReceiver Stub对象
+endnote
+
+IIntentReceiver$Stub <|-- ProxyIIntentReceiver
+ProxyIIntentReceiver *-- LoadedApk$ReceiverDispatcher$InnerReceiver
+
+@enduml

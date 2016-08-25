@@ -33,5 +33,13 @@
 
 ![VA中Broadcast发送/接收](https://rawgit.com/prife/VirtualAppDoc/master/pngs/VABroadcast.svg)
 
+### VA中动态Broadcast注册
+
+动态注册Broadcast，最终都会调用ActivityManagerNatvie#registerReceiver方法，因此VA中hook了这个方法
+然后改造IntentFilter的ACTION字段，具体改造方法与静态广播接收器的方式相同。
+
+代码：RegisterReceiver.java
+
+
 **PS**
 [添加SVG图片的方法](http://stackoverflow.com/questions/13808020/include-an-svg-hosted-on-github-in-markdown)
