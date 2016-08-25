@@ -1,0 +1,168 @@
+@startuml
+
+box "ClientSender" #LightBlue
+	participant Context
+	participant ContextImpl
+	participant ActivityManagerNative
+end box
+
+box "system_server" #LightGreen
+	participant ActivityManagerService
+	participant BroadcastQueue
+	participant IApplicationThread
+	participant ApplicationThreadProxy
+end box
+
+box "ClientReceiver process" #Gray
+	participant ApplicationThreadNative
+	participant ApplicationThread
+	participant BroadcastReceiver
+	participant ReceiverData
+end box
+
+note left of Context
+本图为Android系统中，应用发送广播到广播被接收的处理过程
+endnote
+
+note left of Context
+在VA中安装应用时，已经解析应用的AndroidManifests.xml
+中所有receiver，分别注册到VA应用中，并修改了ACTION。
+因此对应的广播发送程序也需要安装到VA中。
+
+本图做如下说明：
+ClientSender，广播发送应用
+ClientReceiver，广播接收应用
+endnote
+
+[-> Context : sendBroadcast
+
+activate Context
+
+    Context -> ContextImpl : sendBroadcast
+    activate ContextImpl
+
+        ContextImpl -> ActivityManagerNative : sendBroadcast
+        activate ActivityManagerNative
+            ActivityManagerNative -> ActivityManagerService : broadcastIntent
+            activate ActivityManagerService
+                ActivityManagerService -> ActivityManagerService : broadcastIntentLocked
+                activate ActivityManagerService
+                    ActivityManagerService -> BroadcastQueue : scheduleBroadcastsLocked
+                    activate BroadcastQueue
+                        BroadcastQueue -> BroadcastQueue : sendMessage(BROADCAST_INTENT_MSG)
+                        activate BroadcastQueue
+                        deactivate BroadcastQueue
+                    deactivate BroadcastQueue
+                deactivate ActivityManagerService
+            deactivate ActivityManagerService
+        deactivate ActivityManagerNative
+    deactivate ContextImpl
+
+[<- Context
+deactivate Context
+
+...
+BroadcastQueue -> BroadcastQueue : handleMessage
+activate BroadcastQueue
+    BroadcastQueue -> BroadcastQueue : processNextBroadcast
+    activate BroadcastQueue
+
+        note over BroadcastQueue : 动态receiver
+        BroadcastQueue -> BroadcastQueue : deliverToRegisteredReceiverLocked
+        activate BroadcastQueue
+            BroadcastQueue -> BroadcastQueue : performReceiveLocked
+            activate BroadcastQueue
+                BroadcastQueue -> IApplicationThread : scheduleRegisteredReceiver
+                activate IApplicationThread
+                    IApplicationThread -> ApplicationThreadProxy : scheduleRegisteredReceiver
+                    activate ApplicationThreadProxy
+                        ApplicationThreadProxy -> ApplicationThreadNative : scheduleRegisteredReceiver
+                        activate ApplicationThreadNative
+                        note over ApplicationThreadProxy
+                        这里使用了ONEWAY关键字，因此这条binder调用是异步执行的
+                        endnote
+                        deactivate ApplicationThreadNative
+                    deactivate ApplicationThreadProxy
+                deactivate IApplicationThread
+            deactivate BroadcastQueue
+        deactivate BroadcastQueue
+
+            ...
+            ApplicationThreadNative -> ApplicationThreadNative : scheduleRegisteredReceiver
+            activate ApplicationThreadNative
+                ApplicationThreadNative -> ApplicationThread : scheduleRegisteredReceiver
+                activate ApplicationThread
+
+                deactivate ApplicationThread
+            deactivate ApplicationThreadNative
+
+
+        note over BroadcastQueue : 静态receiver，所属进程已创建
+        BroadcastQueue -> BroadcastQueue : processCurBroadcastLocked
+        activate BroadcastQueue
+            BroadcastQueue -> IApplicationThread : scheduleReceiver
+                activate IApplicationThread
+                    IApplicationThread -> ApplicationThreadProxy : scheduleRegisteredReceiver
+                    activate ApplicationThreadProxy
+                        ApplicationThreadProxy -> ApplicationThreadNative : scheduleRegisteredReceiver
+                        activate ApplicationThreadNative
+                        note over ApplicationThreadProxy
+                        这里使用了ONEWAY关键字，因此这条binder调用是异步执行的
+                        endnote
+                        deactivate ApplicationThreadNative
+                    deactivate ApplicationThreadProxy
+                deactivate IApplicationThread
+            deactivate IApplicationThread
+        deactivate BroadcastQueue
+
+            ...
+            ApplicationThreadNative -> ApplicationThreadNative : scheduleReceiver
+            activate ApplicationThreadNative
+                ApplicationThreadNative -> ApplicationThread : scheduleReceiver
+                activate ApplicationThread
+                    ApplicationThread -> ApplicationThread : sendMessage(RECEIVER)
+                deactivate ApplicationThread
+            deactivate ApplicationThreadNative
+
+            ...
+            ApplicationThread -> ApplicationThread : handleMessage(RECEIVER)
+            activate ApplicationThread
+                ApplicationThread -> ApplicationThread : handleReceiver
+                activate ApplicationThread
+
+                    ApplicationThread <-- BroadcastReceiver : 反射创建receiver
+                    activate BroadcastReceiver
+                    deactivate BroadcastReceiver
+
+                    note over ApplicationThread
+                    在这里处理使用反射创建xml中定义的的静态receiver类，
+                    并回调onReceive方法
+                    endnote
+
+                    ApplicationThread -> BroadcastReceiver : onReceive
+                    activate BroadcastReceiver
+                    deactivate BroadcastReceiver
+
+                    ApplicationThread -> ReceiverData : finish
+                    activate ReceiverData
+                        ReceiverData -> ActivityManagerService : finishReceiver
+                        activate ActivityManagerService
+                        note over ActivityManagerService
+                        这里继续调用r.queue.processNextBroadcast(false);
+                        处理下一条广播
+                        endnote
+                        deactivate ActivityManagerService
+                    deactivate ReceiverData
+                deactivate ApplicationThread
+
+            deactivate ApplicationThread
+
+        note over BroadcastQueue : 静态receiver，所属进程未创建
+        BroadcastQueue -> BroadcastQueue : processCurBroadcastLocked
+        activate BroadcastQueue
+        deactivate BroadcastQueue
+    deactivate BroadcastQueue
+deactivate BroadcastQueue
+
+
+@enduml
