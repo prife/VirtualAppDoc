@@ -1,5 +1,14 @@
 ﻿# VirtualAppDoc
 
+说明：本工程是[VirtualApp](https://github.com/asLody/VirtualApp)项目的非官方文档。
+
+理解VirtualApp代码的过程中，对我帮助很大两组系列文章：
+
+- https://github.com/tiann/understand-plugin-framework
+- http://gityuan.com/
+
+PS.还有很多文章无法一一列举, 谨表谢忱。
+
 ## Server Process 启动流程
 
 **getService**
@@ -40,6 +49,9 @@
 
 代码：RegisterReceiver.java
 
+类结构图
+![类结构图](https://rawgit.com/prife/VirtualAppDoc/master/pngs/BroadcastClass.svg)
 
 **PS**
+
 [添加SVG图片的方法](http://stackoverflow.com/questions/13808020/include-an-svg-hosted-on-github-in-markdown)
