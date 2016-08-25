@@ -1,45 +1,80 @@
 @startuml
-[-> VAppService : installApp
-activate VAppService
 
-VAppService -> VAppService: install
+box "Main process" #LightBlue
+	participant VirtualCore
+end box
 
-activate VAppService
-VAppService -> VAppService : parsePackage
+box "Server process" #LightGreen
+	participant VAppManagerService
+	participant PackageParserCompat
+	participant VEnvironment
+	participant NativeLibraryHelperCompat
+	participant AppSetting
+	participant StaticBroadcastSystem
+end box
 
-activate VAppService
-VAppService -> PackageParser : new PackageParser(apk.getPath());
-activate PackageParser
-deactivate PackageParser
+[-> VirtualCore : installApp
+activate VirtualCore
 
-VAppService -> PackageParser : parsePackage（apk,...)
-activate PackageParser
-VAppService <-- PackageParser : pkg:PackageParser.Package
-deactivate PackageParser
+VirtualCore -> VAppManagerService : installApp
+activate VAppManagerService
 
+    VAppManagerService -> VAppManagerService: install
+    activate VAppManagerService
+        VAppManagerService -> PackageParserCompat : parsePackage
+        activate PackageParserCompat
+        deactivate PackageParserCompat
 
+        note over VAppManagerService
+        接下来创建client应用需要的相关数据结构，并在VA的data目录下
+        为client创建data目录，与系统中该应用的data目录隔离
+        endnote
 
-deactivate VAppService
+        VAppManagerService -> VEnvironment : getDataAppPackageDirectory(pkg.packageName)
+        activate VEnvironment
+        deactivate VEnvironment
 
-VAppService -> AppFileSystem : getAppLibFolder(pkg.packageName)
-VAppService -> NativeLibraryHelperCompat : copyNativeBinaries
+        VAppManagerService -> NativeLibraryHelperCompat : copyNativeBinaries
+        activate NativeLibraryHelperCompat
+        deactivate NativeLibraryHelperCompat
 
-VAppService -> AppInfo : new AppInfo()
-VAppService <-- AppInfo : appInfo:AppInfo
-activate AppInfo
-deactivate AppInfo
+        VAppManagerService -> AppSetting : new AppSetting()
+        activate AppSetting
+        VAppManagerService <-- AppSetting : appSetting:AppSetting
 
-VAppService -> AppFileSystem : getAppPackageFolder
-VAppService -> AppFileSystem : getAppLibFolder
-VAppService -> AppFileSystem : getAppDVMCacheFolder
-VAppService -> AppFileSystem : getAppCacheFolder
+        note over VAppManagerService
+        接下来构造AppSetting数据结构，其中包括：
+        String packageName;
+        String apkPath;
+        String libPath;
+        String odexDir;
+        boolean dependSystem;
+        int appId;
+        public PackageParser parser;
+        endnote
 
-VAppService -> VAppService : notifyAppInstalled
-activate VAppService
-note right : getBroadcastItem(N).onNewApp(pkgName);
-deactivate VAppService
+        deactivate AppSetting
 
-deactivate VAppService
-[<- VAppService :
-deactivate VAppService
+        VAppManagerService -> StaticBroadcastSystem : startApp
+        note over StaticBroadcastSystem
+        在这里处理client的静态广播接收器，核心思想是对Clientd每个
+        static broadcast receiver分别注册一个动态广播接收器到VA
+        应用（VA服务进程）。
+        注意，VA会修改receiver的IntentFilter的ACTION。
+        并且在这里设计了黑名单机制过滤ACTION。
+        endnote
+        activate StaticBroadcastSystem
+        deactivate StaticBroadcastSystem
+
+        VAppManagerService -> VAppManagerService : notifyAppInstalled
+        activate VAppManagerService
+        deactivate VAppManagerService
+
+    deactivate VAppManagerService
+
+VirtualCore <-- VAppManagerService
+deactivate VAppManagerService
+
+[<- VirtualCore
+deactivate VirtualCore
 @enduml
