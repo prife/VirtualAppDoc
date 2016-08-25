@@ -1,0 +1,211 @@
+@startuml
+
+box "ClientSender" #LightBlue
+	participant Context
+	participant ContextImpl
+	participant ActivityManagerNative
+	participant BroadcastIntent #ff0000
+end box
+
+box "system_server" #LightGreen
+	participant ActivityManagerService
+	participant BroadcastQueue
+	participant IApplicationThread
+	participant ApplicationThreadProxy
+end box
+
+
+box "VA server process" #LightBlue
+	participant StaticBroadcastReceiver #ff0000
+	participant VActivityManagerService #ff0000
+	participant IApplicationThreadKitkat #ff0000
+end box
+
+box "ClientReceiver process" #Gray
+	participant ApplicationThreadNative
+	participant ApplicationThread
+	participant BroadcastReceiver
+	participant ReceiverData
+end box
+
+
+note left of Context
+VA中应用发送广播到广播被接收的处理过程
+主要描述静态广播接收器
+endnote
+
+note left of Context
+在VA中安装应用时，已经解析应用的AndroidManifests.xml
+中所有receiver，分别注册到VA应用中，并修改了ACTION。
+因此对应的广播发送程序也需要安装到VA中。
+
+本图做如下说明：
+ClientSender，广播发送应用
+ClientReceiver，广播接收应用
+其中红色类表示VA的类
+endnote
+
+[-> Context : sendBroadcast
+
+activate Context
+
+    Context -> ContextImpl : sendBroadcast
+    activate ContextImpl
+
+        ContextImpl -> ActivityManagerNative : sendBroadcast
+        activate ActivityManagerNative
+
+            ActivityManagerNative -> BroadcastIntent : broadcastIntent
+            activate BroadcastIntent
+                note over BroadcastIntent
+                在这里对client发送的广播Intent进行拦截，替换ACTION等，
+                替换后的Intent将会被VA应用接收到（安装能接收该广播的应用时，
+                其静态广播已经VA解析并注册相应的动态广播到VA应用本身，且也
+                替换了IntentFilter的ACTION）。
+                这样处理之后，client发送的广播将会被VA程序接收到
+                endnote
+                BroadcastIntent -> BroadcastIntent : onHook
+                activate BroadcastIntent
+                    BroadcastIntent -> BroadcastIntent : handleIntent
+                    activate BroadcastIntent
+                    deactivate BroadcastIntent
+                deactivate BroadcastIntent
+            deactivate BroadcastIntent
+
+            BroadcastIntent -> ActivityManagerService : broadcastIntent
+
+            activate ActivityManagerService
+                ActivityManagerService -> ActivityManagerService : broadcastIntentLocked
+                activate ActivityManagerService
+                    ActivityManagerService -> BroadcastQueue : scheduleBroadcastsLocked
+                    activate BroadcastQueue
+                        BroadcastQueue -> BroadcastQueue : sendMessage(BROADCAST_INTENT_MSG)
+                        activate BroadcastQueue
+                        deactivate BroadcastQueue
+                    deactivate BroadcastQueue
+                deactivate ActivityManagerService
+            deactivate ActivityManagerService
+        deactivate ActivityManagerNative
+    deactivate ContextImpl
+
+[<- Context
+deactivate Context
+
+...
+BroadcastQueue -> BroadcastQueue : handleMessage
+activate BroadcastQueue
+    BroadcastQueue -> BroadcastQueue : processNextBroadcast
+    activate BroadcastQueue
+
+        note over BroadcastQueue : 动态receiver
+        BroadcastQueue -> BroadcastQueue : deliverToRegisteredReceiverLocked
+        activate BroadcastQueue
+            BroadcastQueue -> BroadcastQueue : performReceiveLocked
+            activate BroadcastQueue
+            deactivate BroadcastQueue
+        deactivate BroadcastQueue
+
+            ...
+            ApplicationThreadNative -> ApplicationThreadNative : scheduleRegisteredReceiver
+            activate ApplicationThreadNative
+                ApplicationThreadNative -> ApplicationThread : scheduleRegisteredReceiver
+                activate ApplicationThread
+
+                deactivate ApplicationThread
+            deactivate ApplicationThreadNative
+
+
+        note over BroadcastQueue : 静态receiver，所属进程已创建
+        BroadcastQueue -> BroadcastQueue : processCurBroadcastLocked
+        activate BroadcastQueue
+            BroadcastQueue -> StaticBroadcastReceiver
+        deactivate BroadcastQueue
+
+        ...
+        StaticBroadcastReceiver -> StaticBroadcastReceiver : onReceive
+        activate StaticBroadcastReceiver
+            StaticBroadcastReceiver -> VActivityManagerService : handleStaticBroadcast
+            activate VActivityManagerService
+                VActivityManagerService -> VActivityManagerService : handleStaticBroadcastAsUser
+                activate VActivityManagerService
+                    VActivityManagerService -> VActivityManagerService : startProcessIfNeedLocked
+                    activate VActivityManagerService
+                    note over VActivityManagerService
+                    当前VA在这里有宏开关控制，接收器进程不存在时是否启动进程
+                    控制变量为BROADCAST_NOT_STARTED_PKG
+                    endnote
+                    deactivate VActivityManagerService
+
+                    VActivityManagerService -> VActivityManagerService : handleBroadcastIntent
+                    activate VActivityManagerService
+
+
+                        VActivityManagerService -> IApplicationThreadKitkat : scheduleReceiver
+                        activate IApplicationThreadKitkat
+                            note over IApplicationThreadKitkat
+                            这里VA的设计很精巧，利用java的Method Reference语法，
+                            配合注解和反射，执行IApplicationThread.scheduleReceiver，
+                            因为安卓不同版本SDK该方法的参数不一样，所以VA设计了这个方式
+                            兼容多个SDK版本。
+                            endnote
+                            IApplicationThreadKitkat -> ApplicationThreadNative : scheduleReceiver
+                            activate ApplicationThreadNative
+                            deactivate ApplicationThreadNative
+                        deactivate IApplicationThreadKitkat
+
+                    deactivate VActivityManagerService
+                deactivate VActivityManagerService
+            deactivate VActivityManagerService
+        deactivate StaticBroadcastReceiver
+
+            ...
+            ApplicationThreadNative -> ApplicationThreadNative : scheduleReceiver
+            activate ApplicationThreadNative
+                ApplicationThreadNative -> ApplicationThread : scheduleReceiver
+                activate ApplicationThread
+                    ApplicationThread -> ApplicationThread : sendMessage(RECEIVER)
+                deactivate ApplicationThread
+            deactivate ApplicationThreadNative
+
+            ...
+            ApplicationThread -> ApplicationThread : handleMessage(RECEIVER)
+            activate ApplicationThread
+                ApplicationThread -> ApplicationThread : handleReceiver
+                activate ApplicationThread
+
+                    ApplicationThread <-- BroadcastReceiver : 反射创建receiver
+                    activate BroadcastReceiver
+                    deactivate BroadcastReceiver
+
+                    note over ApplicationThread
+                    在这里处理使用反射创建xml中定义的的静态receiver类，
+                    并回调onReceive方法
+                    endnote
+
+                    ApplicationThread -> BroadcastReceiver : onReceive
+                    activate BroadcastReceiver
+                    deactivate BroadcastReceiver
+
+                    ApplicationThread -> ReceiverData : finish
+                    activate ReceiverData
+                        ReceiverData -> ActivityManagerService : finishReceiver
+                        activate ActivityManagerService
+                        note over ActivityManagerService
+                        这里继续调用r.queue.processNextBroadcast(false);
+                        处理下一条广播
+                        endnote
+                        deactivate ActivityManagerService
+                    deactivate ReceiverData
+                deactivate ApplicationThread
+
+            deactivate ApplicationThread
+
+        note over BroadcastQueue : 静态receiver，所属进程未创建
+        BroadcastQueue -> BroadcastQueue : processCurBroadcastLocked
+        activate BroadcastQueue
+        deactivate BroadcastQueue
+    deactivate BroadcastQueue
+deactivate BroadcastQueue
+
+
+@enduml
