@@ -25,7 +25,11 @@
 
 注意：VA对client的xml中定义的receiver（静态广播接收器）做了处理，详细参考VAInstall流程图。
 
+### 标准Broadcast发送/接收
+
 ![标准Broadcast发送/接收](https://rawgit.com/prife/VirtualAppDoc/master/pngs/Broadcast.svg)
+
+### VA中Broadcast发送/接收
 
 ![VA中Broadcast发送/接收](https://rawgit.com/prife/VirtualAppDoc/master/pngs/VABroadcast.svg)
 
