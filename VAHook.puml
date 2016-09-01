@@ -1,0 +1,91 @@
+@startuml
+
+interface IBinder
+
+abstract class Hook {
+    getName()
+    beforeHook
+    onHook
+    afterHook
+    isEnable
+}
+
+interface IHookObject {
+    void addHook(Hook hook);
+    removeHook(hookName);
+    getHook(name);
+    getProxyObject();
+}
+
+class HookObject {
+    Map<String, Hook> mHookMaps;
+    mBaseObject;
+    mProxyObject;
+}
+
+class PatchObject {
+    hookObject
+}
+
+class ActivityManagerPatch {
+}
+
+interface Injectable {
+    inject()
+    isEnvBad()
+}
+
+class IInterface {
+    IBinder asBinder();
+}
+
+class IActivityManager {
+    startActivity()
+    broadcastIntent()
+}
+
+IHookObject <|-- HookObject
+HookObject <|-- PatchObject
+Injectable <|-- PatchObject
+
+Hook <|-- StartActivity
+Hook <|-- BroadcastIntent
+
+IHookObject *-- IInterface
+HookObject *-- Hook
+ActivityManagerPatch *-- StartActivity
+ActivityManagerPatch *-- BroadcastIntent
+
+IBinder <|-- HookBinder
+IHookObject <|-- HookBinder
+
+IInterface <|-- IActivityManager
+
+PatchObject <|-- ActivityManagerPatch
+
+class PatchManager {
+    Map<Class, Injectable> mPatchMaps;
+    init()
+    injectAll()
+    addAllPatches()
+    addPatch()
+    addAllPatches()
+}
+
+PatchManager *-- ActivityManagerPatch
+
+note top of Hook
+该类是对方法的hook,每个Hook对象都对应于一个方法,
+如IActivityManager.startActivity
+endnote
+
+note top of HookObject
+该类对应于一个被hook的类,所有内部都代理了IInterface的某个具体子类,
+该类中有一张表,存储了每个被hook的方法的Hook对象.
+
+该类中对接口类使用
+Proxy.newProxyInstance
+InvocationHandler
+endnote
+
+@enduml
