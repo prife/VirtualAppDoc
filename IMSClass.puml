@@ -1,0 +1,94 @@
+@startuml
+
+note as N1
+类说明：
+endnote
+
+class InputReaderPolicyInterface {
+}
+
+class InputDispatcherPolicyInterface {
+}
+
+class PointerControllerPolicyInterface {
+}
+
+class NativeInputManager {
+}
+InputReaderPolicyInterface <|-- NativeInputManager
+InputDispatcherPolicyInterface <|-- NativeInputManager
+PointerControllerPolicyInterface <|-- NativeInputManager
+
+
+class InputManagerInterface {
+}
+
+class InputManager {
+    sp<InputReaderInterface> mReader;
+    sp<InputReaderThread> mReaderThread;
+
+    sp<InputDispatcherInterface> mDispatcher;
+    sp<InputDispatcherThread> mDispatcherThread;
+}
+
+class InputReaderInterface {
+}
+
+class InputReader {
+    sp<InputReaderPolicyInterface> mPolicy;
+    sp<QueuedInputListener> mQueuedListener;
+}
+
+class InputListenerInterface {
+}
+
+class InputDispatcherInterface {
+}
+
+class InputDispatcher {
+sp<InputDispatcherPolicyInterface> mPolicy;
+}
+
+class QueuedInputListener {
+sp<InputListenerInterface> mInnerListener;
+}
+
+class Thread {
+}
+class InputReaderThread {
+    sp<InputReaderInterface> mReader;
+    virtual bool threadLoop();
+}
+
+class InputDispatcherThread {
+sp<InputDispatcherInterface> mDispatcher;
+virtual bool threadLoop();
+}
+
+InputManagerInterface <|-- InputManager
+
+Thread <|-- InputReaderThread
+Thread <|-- InputDispatcherThread
+
+InputReaderThread *-- InputReaderInterface
+InputDispatcherThread *-- InputDispatcherInterface
+
+InputManager *-- InputReaderInterface
+InputManager *-- InputDispatcherInterface
+InputManager *-- InputReaderThread
+InputManager *-- InputDispatcherThread
+
+InputReaderInterface <|-- InputReader
+
+InputListenerInterface <|-- InputDispatcherInterface
+InputDispatcherInterface <|-- InputDispatcher
+InputListenerInterface <|-- QueuedInputListener
+
+QueuedInputListener *-- InputListenerInterface
+
+InputDispatcher *-- InputDispatcherPolicyInterface
+
+InputReader *-- InputReaderPolicyInterface
+InputReader *-- QueuedInputListener
+
+@enduml
